@@ -1093,13 +1093,7 @@
             <id>prod</id>
             <activation>
                 <activeByDefault>true</activeByDefault>
-                <property>
-                    <name>!dev</name>
-                </property>
             </activation>
-            <properties>
-                <scope.runtime>provided</scope.runtime>
-            </properties>
         </profile>
 
         <profile>
