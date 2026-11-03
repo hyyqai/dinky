@@ -318,5 +318,12 @@
                 <include>*/*</include>
             </includes>
         </fileSet>-->
+        <fileSet>
+            <directory>${project.parent.basedir}/dinky-spark-runner/target</directory>
+            <outputDirectory>lib/spark</outputDirectory>
+            <includes>
+                <include>dinky-spark-runner.jar</include>
+            </includes>
+        </fileSet>
     </fileSets>
 </assembly>
