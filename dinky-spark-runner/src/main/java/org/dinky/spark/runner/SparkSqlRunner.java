@@ -42,6 +42,9 @@ public final class SparkSqlRunner {
     private static final Pattern SECRET_PATTERN = Pattern.compile(
             "(?i)(?:\"|')?(password|passwd|pwd|secret|token|access[._-]?key)(?:\"|')?\\s*(?:=>|=|:)\\s*(?:\"[^\"]*\"|'[^']*'|\\S+)");
 
+    private static final Pattern SECRET_OPTIONS_PATTERN =
+            Pattern.compile("(?i)(?:\"|')?(password|passwd|pwd|secret|token|access[._-]?key)(?:\"|')?\\s+'[^']*'");
+
     private static final Pattern JDBC_USERINFO = Pattern.compile("(://[^:/@\\s]+:)([^@/\\s]+)(@)");
 
     private SparkSqlRunner() {}
@@ -99,7 +102,7 @@ public final class SparkSqlRunner {
         } catch (Throwable t) {
             response.setSuccess(false);
             response.setError(failureSummary(t));
-            System.err.println("[DINKY-SPARK] job failed: " + response.getError());
+            System.err.println("[DINKY-SPARK] job failed: " + stackSummary(t));
             exitCode = 1;
         } finally {
             response.setEndTime(LocalDateTime.now().toString());
@@ -133,6 +136,10 @@ public final class SparkSqlRunner {
     }
 
     static String failureSummary(Throwable t) {
+        return redact(t.getClass().getSimpleName() + ": " + t.getMessage());
+    }
+
+    static String stackSummary(Throwable t) {
         StringBuilder summary =
                 new StringBuilder(t.getClass().getSimpleName()).append(": ").append(t.getMessage());
         StackTraceElement[] trace = t.getStackTrace();
@@ -151,6 +158,7 @@ public final class SparkSqlRunner {
             return null;
         }
         String redacted = SECRET_PATTERN.matcher(text).replaceAll("$1=***");
+        redacted = SECRET_OPTIONS_PATTERN.matcher(redacted).replaceAll("$1 '***'");
         redacted = JDBC_USERINFO.matcher(redacted).replaceAll("$1***$3");
         if (redacted.length() > MAX_ERROR_CHARS) {
             return redacted.substring(0, MAX_ERROR_CHARS) + "...(truncated)";

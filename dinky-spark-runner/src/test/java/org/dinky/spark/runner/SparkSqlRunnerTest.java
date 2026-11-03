@@ -44,11 +44,25 @@ public class SparkSqlRunnerTest {
     public void failureSummaryContainsExceptionAndIsBounded() {
         String summary = SparkSqlRunner.failureSummary(new IllegalStateException("boom"));
         assertThat(summary).contains("IllegalStateException").contains("boom");
+        assertThat(summary).doesNotContain("\n  at ");
 
         char[] chars = new char[5000];
         java.util.Arrays.fill(chars, 'x');
         String huge = SparkSqlRunner.failureSummary(new IllegalStateException(new String(chars)));
         assertThat(huge.length()).isLessThanOrEqualTo(SparkSqlRunner.MAX_ERROR_CHARS + 20);
+    }
+
+    @Test
+    public void stackSummaryKeepsFramesForServerLog() {
+        String summary = SparkSqlRunner.stackSummary(new IllegalStateException("boom"));
+        assertThat(summary).contains("IllegalStateException").contains("\n  at ");
+    }
+
+    @Test
+    public void redactsSparkOptionsStyleSecrets() {
+        String redacted = SparkSqlRunner.redact("OPTIONS ('password' 'secret', 'token' 'abc')");
+        assertThat(redacted).doesNotContain("secret").doesNotContain("abc");
+        assertThat(redacted).contains("'***'");
     }
 
     @Test
