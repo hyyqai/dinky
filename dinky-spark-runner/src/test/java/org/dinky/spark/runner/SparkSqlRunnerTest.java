@@ -60,9 +60,12 @@ public class SparkSqlRunnerTest {
 
     @Test
     public void redactsSparkOptionsStyleSecrets() {
-        String redacted = SparkSqlRunner.redact("OPTIONS ('password' 'secret', 'token' 'abc')");
-        assertThat(redacted).doesNotContain("secret").doesNotContain("abc");
-        assertThat(redacted).contains("'***'");
+        assertThat(SparkSqlRunner.redact("OPTIONS ('password' 'secret', 'token' 'abc')"))
+                .doesNotContain("secret")
+                .doesNotContain("abc");
+        assertThat(SparkSqlRunner.redact("OPTIONS (\"password\" \"s3cr3t\")")).doesNotContain("s3cr3t");
+        assertThat(SparkSqlRunner.redact("OPTIONS (`password` 's3cr3t')")).doesNotContain("s3cr3t");
+        assertThat(SparkSqlRunner.redact("OPTIONS ('password' 'it''s-secret')")).doesNotContain("secret");
     }
 
     @Test

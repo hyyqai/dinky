@@ -225,6 +225,17 @@ public class SparkSubmitServiceTest {
     }
 
     @Test
+    public void readTailRedactsSecrets() throws Exception {
+        Path logFile = Files.createTempFile("spark-log-secret", ".log");
+        Files.write(
+                logFile, "failed: password='secret' and OPTIONS (\"token\" \"abc\")".getBytes(StandardCharsets.UTF_8));
+
+        String tail = new SparkSubmitService(properties()).readTail(logFile, 4096);
+
+        assertThat(tail).doesNotContain("secret").doesNotContain("abc");
+    }
+
+    @Test
     public void parseResultUsesLastSelectResult() {
         SparkSubmitService service = new SparkSubmitService(properties());
         String json = "{\"success\":true,\"appId\":\"app-1\",\"results\":["

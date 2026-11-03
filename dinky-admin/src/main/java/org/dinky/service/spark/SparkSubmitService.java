@@ -46,6 +46,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 import org.springframework.stereotype.Service;
 
@@ -61,6 +62,10 @@ public class SparkSubmitService {
     public static final String RUNNER_MAIN_CLASS = "org.dinky.spark.runner.SparkSqlRunner";
 
     private static final int MAX_LOG_TAIL_BYTES = 64 * 1024;
+
+    private static final Pattern SECRET_PATTERN =
+            Pattern.compile("(?i)[\"'`]?(password|passwd|pwd|secret|token|access[._-]?key)[\"'`]?\\s*(?:=>|[=:])?\\s*"
+                    + "('(?:[^']|'')*'|\"(?:[^\"\\\\]|\\\\.)*\"|`[^`]*`|\\S+)");
 
     private final SparkProperties properties;
 
@@ -315,7 +320,7 @@ public class SparkSubmitService {
                     text = text.substring(firstNewline + 1);
                 }
             }
-            return text;
+            return SECRET_PATTERN.matcher(text).replaceAll("$1=***");
         } catch (Exception e) {
             return "";
         }
