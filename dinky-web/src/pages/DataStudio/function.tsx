@@ -207,6 +207,8 @@ export const getTabIcon = (type: string, size?: number) => {
       return <FlinkJarSvg size={size} />;
     case DIALECT.FLINK_SQL:
       return <FlinkSQLSvg size={size} />;
+    case DIALECT.SPARK_SQL:
+      return <SQLIcons size={size} />;
     case DIALECT.FLINKSQLENV:
       return <FlinkSQLEnvSvg size={size} />;
     case DIALECT.SQL:
@@ -324,6 +326,8 @@ export const matchLanguage = (language = DIALECT.FLINK_SQL) => {
     case DIALECT.FLINKSQLENV:
     case DIALECT.FLINKJAR:
       return DIALECT.FLINK_SQL;
+    case DIALECT.SPARK_SQL:
+      return DIALECT.SQL;
     case DIALECT.SQL:
     case DIALECT.SQLSERVER:
     case DIALECT.POSTGRESQL:

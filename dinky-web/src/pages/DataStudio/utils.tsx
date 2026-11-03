@@ -94,6 +94,11 @@ export const isSql = (dialect: string = '', includedFlinkSQL: boolean = false) =
 };
 
 /**
+ * @description: 判断是否为 Spark SQL 方言
+ */
+export const isSparkSql = (dialect: string = '') => dialect?.toLowerCase() === DIALECT.SPARK_SQL;
+
+/**
  * 判断 不为空或者不为 undefined | determine whether it is not empty or not undefined
  * @param value
  */

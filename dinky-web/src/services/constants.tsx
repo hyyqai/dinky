@@ -218,6 +218,7 @@ export const DIALECT = {
   TAR: 'tar',
   TAR_GZ: 'gz',
   FLINKSQLENV: 'flinksqlenv',
+  SPARK_SQL: 'sparksql',
   MYSQL: 'mysql',
   ORACLE: 'oracle',
   SQLSERVER: 'sqlserver',
