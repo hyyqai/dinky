@@ -30,7 +30,7 @@ import { DataIndex } from 'rc-table/es/interface';
 import React, { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { useAsyncEffect } from 'ahooks';
 import { DataStudioActionType } from '@/pages/DataStudio/data.d';
-import { isSql } from '@/pages/DataStudio/utils';
+import { isSql, isSparkSql } from '@/pages/DataStudio/utils';
 import { ProTable } from '@ant-design/pro-components';
 import { getInsights } from '@antv/ava';
 import { InsightCard } from '@antv/ava-react';
@@ -216,7 +216,7 @@ export default (props: {
   };
 
   useAsyncEffect(async () => {
-    if (!isSql(dialect)) {
+    if (!isSql(dialect) && !isSparkSql(dialect)) {
       setDataList([]);
       await loadData();
     } else {
@@ -244,7 +244,7 @@ export default (props: {
   const renderFlinkSQLContent = () => {
     return (
       <>
-        {!isSql(dialect) ? (
+        {!isSql(dialect) && !isSparkSql(dialect) ? (
           <Button loading={loading} type='primary' onClick={showDetail} icon={<SyncOutlined />}>
             {l('pages.datastudio.label.result.query.latest.data')}
           </Button>

@@ -47,7 +47,7 @@ import Result from '@/pages/DataStudio/Toolbar/Service/Result';
 import { getTabIcon } from '@/pages/DataStudio/function';
 import { DIALECT } from '@/services/constants';
 import { TableData } from '@/pages/DataStudio/Toolbar/Service/TableData';
-import { isSql } from '@/pages/DataStudio/utils';
+import { isSql, isSparkSql } from '@/pages/DataStudio/utils';
 import { useAsyncEffect } from 'ahooks';
 import { sleep } from '@antfu/utils';
 import { l } from '@/utils/intl';
@@ -192,7 +192,8 @@ const Service = (props: { showDesc: boolean; tabs: CenterTab[]; action: any }) =
           const dialect = tab.params.dialect;
           if (
             assert(dialect, [DIALECT.FLINK_SQL, DIALECT.FLINKJAR], true, 'includes') ||
-            isSql(dialect)
+            isSql(dialect) ||
+            isSparkSql(dialect)
           ) {
             const icon = getTabIcon(dialect, 20);
             if (node.key === 'Task') {

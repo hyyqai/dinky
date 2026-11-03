@@ -91,7 +91,7 @@ import { API_CONSTANTS } from '@/services/endpoints';
 import { Jobs, LineageDetailInfo } from '@/types/DevOps/data';
 import { lockTask, matchLanguage } from '@/pages/DataStudio/function';
 import { PushpinIcon } from '@/components/Icons/CustomIcons';
-import { assert, isSql } from '@/pages/DataStudio/utils';
+import { assert, isSql, isSparkSql } from '@/pages/DataStudio/utils';
 import { DIALECT } from '@/services/constants';
 import { SysConfigStateType } from '@/pages/SettingCenter/GlobalSetting/model';
 import CodeEdit from '@/components/CustomEditor/CodeEdit';
@@ -239,8 +239,13 @@ export const SqlTask = memo((props: FlinkSqlProps & any) => {
         });
         setOriginStatementValue(sqlConvertForm?.initSqlStatement ?? '');
         updateCenterTab({ ...props.tabData, params: newParams });
-        if (params?.statement && !(params?.statement == sqlConvertForm?.initSqlStatement
-          || params?.statement == taskDetail?.statement)) {
+        if (
+          params?.statement &&
+          !(
+            params?.statement == sqlConvertForm?.initSqlStatement ||
+            params?.statement == taskDetail?.statement
+          )
+        ) {
           setDiff([
             { key: 'statement', server: sqlConvertForm?.initSqlStatement, cache: params.statement }
           ]);
@@ -556,27 +561,33 @@ export const SqlTask = memo((props: FlinkSqlProps & any) => {
         l('pages.datastudio.editor.submitting', '', { jobName: title }),
         currentState.taskId
       );
-      if (result.success) {
-        setCurrentState((prevState) => {
-          return {
-            ...prevState,
-            status: result.data.status === 'SUCCESS' ? 'RUNNING' : result.data.status
-          };
+      const isSpark = isSparkSql(currentState.dialect);
+      if (!result?.success) {
+        return;
+      }
+      setCurrentState((prevState) => {
+        return {
+          ...prevState,
+          status: isSpark
+            ? result.data.status
+            : result.data.status === 'SUCCESS'
+              ? 'RUNNING'
+              : result.data.status
+        };
+      });
+      if (!isSpark && result.data.status === 'SUCCESS') {
+        setIsRunning(true);
+      }
+      if ((isSql(currentState.dialect) || isSpark) && result?.data?.result?.success) {
+        updateAction({
+          actionType: DataStudioActionType.TASK_PREVIEW_RESULT,
+          params: {
+            taskId: currentState.taskId,
+            dialect: currentState.dialect,
+            columns: result.data.result.columns,
+            rowData: result.data.result.rowData
+          }
         });
-        if (result.data.status === 'SUCCESS') {
-          setIsRunning(true);
-        }
-        if (isSql(currentState.dialect) && result?.data?.result?.success) {
-          updateAction({
-            actionType: DataStudioActionType.TASK_PREVIEW_RESULT,
-            params: {
-              taskId: currentState.taskId,
-              dialect: currentState.dialect,
-              columns: result.data.result.columns,
-              rowData: result.data.result.rowData
-            }
-          });
-        }
       }
     } finally {
       setIsSubmitting(false);
@@ -831,7 +842,9 @@ export const SqlTask = memo((props: FlinkSqlProps & any) => {
                   [DIALECT.JAVA, DIALECT.SCALA, DIALECT.PYTHON_LONG],
                   true,
                   'notIncludes'
-                ) && !isSql(currentState.dialect)
+                ) &&
+                !isSql(currentState.dialect) &&
+                !isSparkSql(currentState.dialect)
               }
               hotKey={{
                 ...hotKeyConfig,
@@ -978,7 +991,9 @@ export const SqlTask = memo((props: FlinkSqlProps & any) => {
             <Divider type={'vertical'} style={{ height: dividerHeight }} />
 
             <RunToolBarButton
-              isShow={JOB_LIFE_CYCLE.PUBLISH !== currentState.step}
+              isShow={
+                JOB_LIFE_CYCLE.PUBLISH !== currentState.step && !isSparkSql(currentState.dialect)
+              }
               showDesc={showDesc}
               disabled={isLockTask}
               desc={l('button.publish')}
@@ -986,7 +1001,9 @@ export const SqlTask = memo((props: FlinkSqlProps & any) => {
               onClick={handleChangeJobLife}
             />
             <RunToolBarButton
-              isShow={JOB_LIFE_CYCLE.PUBLISH === currentState.step}
+              isShow={
+                JOB_LIFE_CYCLE.PUBLISH === currentState.step && !isSparkSql(currentState.dialect)
+              }
               showDesc={showDesc}
               disabled={isLockTask}
               desc={l('button.offline')}
@@ -1006,7 +1023,8 @@ export const SqlTask = memo((props: FlinkSqlProps & any) => {
                   [DIALECT.FLINKSQLENV, DIALECT.SCALA, DIALECT.JAVA, DIALECT.PYTHON_LONG],
                   true,
                   'notIncludes'
-                )
+                ) &&
+                !isSparkSql(currentState.dialect)
               }
               hotKey={{
                 ...hotKeyConfig,
