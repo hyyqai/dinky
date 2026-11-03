@@ -585,7 +585,8 @@ export const SqlTask = memo((props: FlinkSqlProps & any) => {
             taskId: currentState.taskId,
             dialect: currentState.dialect,
             columns: result.data.result.columns,
-            rowData: result.data.result.rowData
+            rowData: result.data.result.rowData,
+            truncationFlag: result.data.result.truncationFlag
           }
         });
       }

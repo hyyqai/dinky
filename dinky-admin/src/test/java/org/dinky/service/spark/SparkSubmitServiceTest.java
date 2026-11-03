@@ -29,6 +29,7 @@ import org.dinky.data.result.SelectResult;
 import org.dinky.job.Job;
 import org.dinky.job.JobResult;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -39,9 +40,14 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 public class SparkSubmitServiceTest {
+
+    @Rule
+    public TemporaryFolder folder = new TemporaryFolder();
 
     private SparkProperties properties() {
         SparkProperties p = new SparkProperties();
@@ -128,6 +134,94 @@ public class SparkSubmitServiceTest {
 
         assertThat(tail.length()).isLessThanOrEqualTo(200);
         assertThat(tail).contains("line-9999");
+    }
+
+    @Test
+    public void submitFailsFastWhenDeployModeIsNotClient() {
+        SparkProperties props = properties();
+        props.setDeployMode("cluster");
+        props.setHome("/nonexistent-spark");
+
+        JobResult result = new SparkSubmitService(props).submit(task());
+
+        assertThat(result.getStatus()).isEqualTo(Job.JobStatus.FAILED);
+        assertThat(result.getError()).contains("deploy-mode");
+    }
+
+    @Test
+    public void submitFailsWhenSparkSubmitMissing() {
+        SparkProperties props = properties();
+        props.setHome("/nonexistent-spark");
+
+        JobResult result = new SparkSubmitService(props).submit(task());
+
+        assertThat(result.getStatus()).isEqualTo(Job.JobStatus.FAILED);
+        assertThat(result.getError()).contains("spark-submit");
+    }
+
+    @Test
+    public void submitFailsWhenRunnerJarMissing() throws Exception {
+        File home = folder.newFolder("spark-home");
+        File bin = new File(home, "bin");
+        assertThat(bin.mkdirs()).isTrue();
+        File sparkSubmit = new File(bin, "spark-submit");
+        Files.write(sparkSubmit.toPath(), "#!/bin/sh\n".getBytes(StandardCharsets.UTF_8));
+        assertThat(sparkSubmit.setExecutable(true)).isTrue();
+
+        SparkProperties props = properties();
+        props.setHome(home.getAbsolutePath());
+        props.setRunnerJar(new File(home, "missing-runner.jar").getAbsolutePath());
+
+        JobResult result = new SparkSubmitService(props).submit(task());
+
+        assertThat(result.getStatus()).isEqualTo(Job.JobStatus.FAILED);
+        assertThat(result.getError()).contains("runner jar");
+    }
+
+    @Test(timeout = 15000)
+    public void submitFailsOnTimeout() throws Exception {
+        File home = folder.newFolder("spark-home-timeout");
+        File bin = new File(home, "bin");
+        assertThat(bin.mkdirs()).isTrue();
+        File sparkSubmit = new File(bin, "spark-submit");
+        Files.write(sparkSubmit.toPath(), "#!/bin/sh\nsleep 5\n".getBytes(StandardCharsets.UTF_8));
+        assertThat(sparkSubmit.setExecutable(true)).isTrue();
+        File runnerJar = new File(home, "runner.jar");
+        Files.write(runnerJar.toPath(), new byte[0]);
+
+        SparkProperties props = properties();
+        props.setHome(home.getAbsolutePath());
+        props.setRunnerJar(runnerJar.getAbsolutePath());
+        props.setSubmitTimeoutSeconds(1);
+
+        JobResult result = new SparkSubmitService(props).submit(task());
+
+        assertThat(result.getStatus()).isEqualTo(Job.JobStatus.FAILED);
+        assertThat(result.getError()).contains("timeout");
+    }
+
+    @Test
+    public void parseResultKeepsTruncationFlag() {
+        String json = "{\"success\":true,\"appId\":\"app-1\",\"results\":["
+                + "{\"statement\":\"select a\",\"columns\":[\"a\"],\"rows\":[[1]],\"truncated\":true}]}";
+
+        JobResult result = new SparkSubmitService(properties())
+                .parseResult(json, "select a", LocalDateTime.now(), "/tmp/submit.log");
+
+        assertThat(result.getStatus()).isEqualTo(Job.JobStatus.SUCCESS);
+        assertThat(((SelectResult) result.getResult()).isTruncationFlag()).isTrue();
+    }
+
+    @Test
+    public void parseResultSkipsNullResultEntries() {
+        String json =
+                "{\"success\":true,\"appId\":\"app-1\",\"results\":[null," + "{\"columns\":[\"a\"],\"rows\":[[1]]}]}";
+
+        JobResult result = new SparkSubmitService(properties())
+                .parseResult(json, "select a", LocalDateTime.now(), "/tmp/submit.log");
+
+        assertThat(result.getStatus()).isEqualTo(Job.JobStatus.SUCCESS);
+        assertThat(((SelectResult) result.getResult()).getColumns()).containsExactly("a");
     }
 
     @Test

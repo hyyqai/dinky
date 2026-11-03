@@ -23,7 +23,7 @@ import { transformTableDataToCsv } from '@/utils/function';
 import { l } from '@/utils/intl';
 import { DownloadOutlined, SearchOutlined, SyncOutlined } from '@ant-design/icons';
 import { Highlight } from '@ant-design/pro-layout/es/components/Help/Search';
-import { Button, Drawer, Empty, Input, InputRef, Space, Tabs, TabsProps } from 'antd';
+import { Alert, Button, Drawer, Empty, Input, InputRef, Space, Tabs, TabsProps } from 'antd';
 import { ColumnType } from 'antd/es/table';
 import { FilterConfirmProps } from 'antd/es/table/interface';
 import { DataIndex } from 'rc-table/es/interface';
@@ -58,6 +58,7 @@ export default (props: {
 
   const [dataList, setDataList] = useState<DataList>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [truncationFlag, setTruncationFlag] = useState<boolean>(false);
   const [openAVA, setOpenAVA] = useState<boolean>(false);
   const [avaResult, setAvaResult] = useState<InsightsResult>();
   const [isPending, startTransition] = useTransition();
@@ -66,6 +67,7 @@ export default (props: {
   const searchInput = useRef<InputRef>(null);
   useEffect(() => {
     if (actionType === DataStudioActionType.TASK_PREVIEW_RESULT && taskId === params.taskId) {
+      setTruncationFlag(Boolean(params.truncationFlag));
       setDataList(
         covertDataList(
           { columns: params.columns, rowData: params.rowData },
@@ -301,23 +303,33 @@ export default (props: {
         key: data.tableName ?? index,
         label: data.tableName,
         children: (
-          <ProTable
-            className={'datastudio-theme'}
-            cardBordered
-            columns={getColumns(data.columns)}
-            size='small'
-            scroll={{ x: 'max-content' }}
-            dataSource={data.rowData?.map((item: any, index: number) => {
-              return { ...item, key: index };
-            })}
-            options={{ fullScreen: true, density: false }}
-            search={false}
-            loading={loading}
-            toolBarRender={() => [renderDownloadButton(data), renderAVA(data)]}
-            pagination={{
-              showSizeChanger: true
-            }}
-          />
+          <>
+            {truncationFlag && (
+              <Alert
+                type='warning'
+                showIcon
+                style={{ marginBottom: 8 }}
+                message={l('pages.datastudio.label.result.query.latest.data.truncate')}
+              />
+            )}
+            <ProTable
+              className={'datastudio-theme'}
+              cardBordered
+              columns={getColumns(data.columns)}
+              size='small'
+              scroll={{ x: 'max-content' }}
+              dataSource={data.rowData?.map((item: any, index: number) => {
+                return { ...item, key: index };
+              })}
+              options={{ fullScreen: true, density: false }}
+              search={false}
+              loading={loading}
+              toolBarRender={() => [renderDownloadButton(data), renderAVA(data)]}
+              pagination={{
+                showSizeChanger: true
+              }}
+            />
+          </>
         )
       };
     });

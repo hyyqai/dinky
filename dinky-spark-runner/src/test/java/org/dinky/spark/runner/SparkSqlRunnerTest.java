@@ -41,6 +41,17 @@ public class SparkSqlRunnerTest {
     }
 
     @Test
+    public void failureSummaryContainsExceptionAndIsBounded() {
+        String summary = SparkSqlRunner.failureSummary(new IllegalStateException("boom"));
+        assertThat(summary).contains("IllegalStateException").contains("boom");
+
+        char[] chars = new char[5000];
+        java.util.Arrays.fill(chars, 'x');
+        String huge = SparkSqlRunner.failureSummary(new IllegalStateException(new String(chars)));
+        assertThat(huge.length()).isLessThanOrEqualTo(SparkSqlRunner.MAX_ERROR_CHARS + 20);
+    }
+
+    @Test
     public void redactsQuotedAndJdbcSecrets() {
         String redacted = SparkSqlRunner.redact("failed: 'password' => 'secret' url=jdbc:mysql://user:secret@host/db");
         assertThat(redacted).doesNotContain("secret");

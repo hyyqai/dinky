@@ -172,7 +172,9 @@ public class SparkSubmitService {
         SelectResult lastResult = null;
         if (parsed.getResults() != null) {
             for (SparkResultJson.Result item : parsed.getResults()) {
-                if (item.getColumns() != null && !item.getColumns().isEmpty()) {
+                if (item != null
+                        && item.getColumns() != null
+                        && !item.getColumns().isEmpty()) {
                     lastResult = toSelectResult(parsed.getAppId(), item);
                 }
             }
@@ -204,7 +206,9 @@ public class SparkSubmitService {
                 rowData.add(rowMap);
             }
         }
-        return new SelectResult(appId, rowData, columns);
+        SelectResult selectResult = new SelectResult(appId, rowData, columns);
+        selectResult.setTruncationFlag(item.isTruncated());
+        return selectResult;
     }
 
     private String validate() {
@@ -213,6 +217,9 @@ public class SparkSubmitService {
         }
         if (StringUtils.isBlank(properties.getMaster())) {
             return "dinky.spark.master is required";
+        }
+        if (!"client".equalsIgnoreCase(properties.getDeployMode())) {
+            return "dinky.spark.deploy-mode must be client, got: " + properties.getDeployMode();
         }
         Path sparkSubmit = Paths.get(properties.getHome(), "bin", "spark-submit");
         if (!Files.isRegularFile(sparkSubmit) || !Files.isExecutable(sparkSubmit)) {
