@@ -30,6 +30,7 @@ public enum Dialect {
     FLINK_SQL("FlinkSql"),
     FLINK_JAR("FlinkJar"),
     FLINK_SQL_ENV("FlinkSqlEnv"),
+    SPARK_SQL("SparkSql"),
     SQL("Sql"),
     JAVA("Java"),
     PYTHON("Python"),
