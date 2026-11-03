@@ -20,7 +20,6 @@
 package org.dinky.service.spark;
 
 import org.dinky.data.dto.TaskDTO;
-import org.dinky.data.model.ext.TaskExtConfig;
 import org.dinky.data.result.SelectResult;
 import org.dinky.job.Job;
 import org.dinky.job.JobResult;
@@ -30,6 +29,7 @@ import org.dinky.utils.SqlUtil;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -59,6 +59,8 @@ import lombok.extern.slf4j.Slf4j;
 public class SparkSubmitService {
 
     public static final String RUNNER_MAIN_CLASS = "org.dinky.spark.runner.SparkSqlRunner";
+
+    private static final int MAX_LOG_TAIL_BYTES = 64 * 1024;
 
     private final SparkProperties properties;
 
@@ -102,10 +104,10 @@ public class SparkSubmitService {
                         task.getStatement(),
                         startTime,
                         "Spark job finished with exit code " + process.exitValue() + " but no result file, log: "
-                                + logFile + "\n" + tail(logFile, 100));
+                                + logFile + "\n" + readTail(logFile, MAX_LOG_TAIL_BYTES));
             }
 
-            String json = new String(Files.readAllBytes(resultFile), StandardCharsets.UTF_8);
+            String json = readResultFile(resultFile);
             JobResult result = parseResult(json, task.getStatement(), startTime, logFile.toString());
             if (result.isSuccess()) {
                 FileUtil.del(workDir.toFile());
@@ -137,7 +139,7 @@ public class SparkSubmitService {
         command.add(properties.getExecutorMemory());
         command.add("--executor-cores");
         command.add(String.valueOf(properties.getExecutorCores()));
-        for (Map.Entry<String, String> entry : mergedConf(task).entrySet()) {
+        for (Map.Entry<String, String> entry : mergedConf().entrySet()) {
             command.add("--conf");
             command.add(entry.getKey() + "=" + entry.getValue());
         }
@@ -223,16 +225,8 @@ public class SparkSubmitService {
         return null;
     }
 
-    private Map<String, String> mergedConf(TaskDTO task) {
+    private Map<String, String> mergedConf() {
         Map<String, String> merged = new LinkedHashMap<>(properties.getConf());
-        TaskExtConfig config = task.getConfigJson();
-        if (config != null) {
-            config.getCustomConfigMaps().forEach((key, value) -> {
-                if (key != null && key.startsWith("spark.")) {
-                    merged.put(key, value);
-                }
-            });
-        }
         merged.putIfAbsent("spark.driver.host", localHostName());
         merged.putIfAbsent("spark.driver.bindAddress", "0.0.0.0");
         merged.putIfAbsent("spark.cores.max", String.valueOf(properties.getCoresMax()));
@@ -291,11 +285,30 @@ public class SparkSubmitService {
         }
     }
 
-    private String tail(Path logFile, int lines) {
-        try {
-            List<String> all = Files.readAllLines(logFile, StandardCharsets.UTF_8);
-            int from = Math.max(0, all.size() - lines);
-            return String.join("\n", all.subList(from, all.size()));
+    String readResultFile(Path resultFile) throws IOException {
+        long size = Files.size(resultFile);
+        if (size > properties.getMaxResultBytes()) {
+            throw new IOException("Spark result file is too large: " + size + " bytes, limit "
+                    + properties.getMaxResultBytes() + " bytes");
+        }
+        return new String(Files.readAllBytes(resultFile), StandardCharsets.UTF_8);
+    }
+
+    String readTail(Path logFile, int maxBytes) {
+        try (RandomAccessFile file = new RandomAccessFile(logFile.toFile(), "r")) {
+            long length = file.length();
+            long start = Math.max(0, length - maxBytes);
+            file.seek(start);
+            byte[] buffer = new byte[(int) (length - start)];
+            file.readFully(buffer);
+            String text = new String(buffer, StandardCharsets.UTF_8);
+            if (start > 0) {
+                int firstNewline = text.indexOf('\n');
+                if (firstNewline >= 0 && firstNewline + 1 < text.length()) {
+                    text = text.substring(firstNewline + 1);
+                }
+            }
+            return text;
         } catch (Exception e) {
             return "";
         }

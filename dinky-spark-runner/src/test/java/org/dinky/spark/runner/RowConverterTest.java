@@ -56,6 +56,15 @@ public class RowConverterTest {
     }
 
     @Test
+    public void hugeByteArrayIsBounded() {
+        byte[] data = new byte[RowConverter.MAX_CELL_CHARS];
+        String converted =
+                (String) RowConverter.convert(RowFactory.create(data)).get(0);
+        assertThat(converted.length()).isLessThanOrEqualTo(RowConverter.MAX_CELL_CHARS + 20);
+        assertThat(converted).endsWith("...(truncated)");
+    }
+
+    @Test
     public void complexValueBecomesString() {
         Row row = RowFactory.create(new int[] {1, 2});
         assertThat(RowConverter.convert(row).get(0)).isInstanceOf(String.class);

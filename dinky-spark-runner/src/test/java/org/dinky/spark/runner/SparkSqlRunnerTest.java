@@ -41,6 +41,14 @@ public class SparkSqlRunnerTest {
     }
 
     @Test
+    public void redactsQuotedAndJdbcSecrets() {
+        String redacted = SparkSqlRunner.redact("failed: 'password' => 'secret' url=jdbc:mysql://user:secret@host/db");
+        assertThat(redacted).doesNotContain("secret");
+        assertThat(redacted).contains("password=***");
+        assertThat(redacted).contains("user:***@");
+    }
+
+    @Test
     public void redactsSecretsFromErrorText() {
         String redacted = SparkSqlRunner.redact("failed: password='secret' and token: abc");
         assertThat(redacted).doesNotContain("secret").doesNotContain("abc");

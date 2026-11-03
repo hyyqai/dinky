@@ -26,12 +26,15 @@ import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 
 public final class RowConverter {
 
     public static final int MAX_CELL_CHARS = 1_000_000;
+
+    private static final int MAX_CELL_BYTES = MAX_CELL_CHARS * 3 / 4;
 
     private static final String TRUNCATED = "...(truncated)";
 
@@ -68,7 +71,11 @@ public final class RowConverter {
             return value.toString();
         }
         if (value instanceof byte[]) {
-            return truncate(Base64.getEncoder().encodeToString((byte[]) value));
+            byte[] bytes = (byte[]) value;
+            if (bytes.length <= MAX_CELL_BYTES) {
+                return Base64.getEncoder().encodeToString(bytes);
+            }
+            return Base64.getEncoder().encodeToString(Arrays.copyOf(bytes, MAX_CELL_BYTES)) + TRUNCATED;
         }
         return truncate(String.valueOf(value));
     }

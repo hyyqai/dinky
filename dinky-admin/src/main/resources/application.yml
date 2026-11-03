@@ -183,4 +183,5 @@ dinky:
     cores-max: 1
     result-max-rows: 1000
     submit-timeout-seconds: 600
+    max-result-bytes: 67108864
     conf: {}

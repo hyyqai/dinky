@@ -37,8 +37,12 @@ public final class SparkSqlRunner {
 
     public static final int MAX_STATEMENTS = 200;
 
-    private static final Pattern SECRET_PATTERN =
-            Pattern.compile("(?i)(password|passwd|secret|token|access[._-]?key)\\s*[=:]\\s*'?[^,'\\s)]+'?");
+    private static final int MAX_ERROR_CHARS = 2000;
+
+    private static final Pattern SECRET_PATTERN = Pattern.compile(
+            "(?i)(?:\"|')?(password|passwd|pwd|secret|token|access[._-]?key)(?:\"|')?\\s*(?:=>|=|:)\\s*(?:\"[^\"]*\"|'[^']*'|\\S+)");
+
+    private static final Pattern JDBC_USERINFO = Pattern.compile("(://[^:/@\\s]+:)([^@/\\s]+)(@)");
 
     private SparkSqlRunner() {}
 
@@ -131,6 +135,11 @@ public final class SparkSqlRunner {
         if (text == null) {
             return null;
         }
-        return SECRET_PATTERN.matcher(text).replaceAll("$1=***");
+        String redacted = SECRET_PATTERN.matcher(text).replaceAll("$1=***");
+        redacted = JDBC_USERINFO.matcher(redacted).replaceAll("$1***$3");
+        if (redacted.length() > MAX_ERROR_CHARS) {
+            return redacted.substring(0, MAX_ERROR_CHARS) + "...(truncated)";
+        }
+        return redacted;
     }
 }

@@ -54,6 +54,8 @@ public class SparkProperties {
 
     private int submitTimeoutSeconds = 600;
 
+    private int maxResultBytes = 64 * 1024 * 1024;
+
     private String javaHome = "";
 
     private String hadoopConfDir = "";

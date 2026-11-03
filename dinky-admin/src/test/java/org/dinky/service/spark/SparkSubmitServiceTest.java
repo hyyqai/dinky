@@ -20,6 +20,7 @@
 package org.dinky.service.spark;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.dinky.data.dto.TaskDTO;
 import org.dinky.data.ext.ConfigItem;
@@ -28,9 +29,13 @@ import org.dinky.data.result.SelectResult;
 import org.dinky.job.Job;
 import org.dinky.job.JobResult;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 
@@ -63,15 +68,11 @@ public class SparkSubmitServiceTest {
         task.setName("spark_demo");
         task.setDialect("SparkSql");
         task.setStatement("select 1; select 2");
-        TaskExtConfig config = new TaskExtConfig();
-        config.setCustomConfig(Arrays.asList(
-                new ConfigItem("spark.executor.memory", "768m"), new ConfigItem("not.spark.key", "ignored")));
-        task.setConfigJson(config);
         return task;
     }
 
     @Test
-    public void buildCommandContainsRequiredArgsAndOverrides() {
+    public void buildCommandContainsRequiredArgs() {
         SparkSubmitService service = new SparkSubmitService(properties());
         List<String> command = service.buildCommand(task(), Paths.get("/tmp/req.json"), Paths.get("/tmp/res.json"));
 
@@ -82,11 +83,51 @@ public class SparkSubmitServiceTest {
         assertThat(command).containsSubsequence("--driver-memory", "512m");
         assertThat(command).containsSubsequence("--executor-memory", "512m");
         assertThat(command).contains("spark.driver.host=dinky");
-        assertThat(command).contains("spark.executor.memory=768m");
-        assertThat(command).doesNotContain("not.spark.key=ignored");
+        assertThat(command).contains("spark.executor.memory=512m");
+        assertThat(command).doesNotContain("768m");
         assertThat(command).contains("/opt/dinky/lib/spark/dinky-spark-runner.jar");
         assertThat(command.subList(command.size() - 4, command.size()))
                 .containsExactly("--request-file", "/tmp/req.json", "--result-file", "/tmp/res.json");
+    }
+
+    @Test
+    public void ignoresTaskLevelSparkConf() {
+        TaskDTO task = task();
+        TaskExtConfig config = new TaskExtConfig();
+        config.setCustomConfig(
+                Collections.singletonList(new ConfigItem("spark.driver.extraJavaOptions", "-javaagent:/tmp/evil.jar")));
+        task.setConfigJson(config);
+
+        List<String> command = new SparkSubmitService(properties())
+                .buildCommand(task, Paths.get("/tmp/req.json"), Paths.get("/tmp/res.json"));
+
+        assertThat(command).noneMatch(value -> value.contains("extraJavaOptions"));
+    }
+
+    @Test
+    public void rejectsOversizedResultFile() throws Exception {
+        SparkProperties props = properties();
+        props.setMaxResultBytes(5);
+        Path resultFile = Files.createTempFile("spark-result", ".json");
+        Files.write(resultFile, "123456".getBytes(StandardCharsets.UTF_8));
+
+        assertThatThrownBy(() -> new SparkSubmitService(props).readResultFile(resultFile))
+                .isInstanceOf(IOException.class);
+    }
+
+    @Test
+    public void readsBoundedTail() throws Exception {
+        Path logFile = Files.createTempFile("spark-log", ".log");
+        StringBuilder content = new StringBuilder();
+        for (int i = 0; i < 10000; i++) {
+            content.append("line-").append(i).append('\n');
+        }
+        Files.write(logFile, content.toString().getBytes(StandardCharsets.UTF_8));
+
+        String tail = new SparkSubmitService(properties()).readTail(logFile, 200);
+
+        assertThat(tail.length()).isLessThanOrEqualTo(200);
+        assertThat(tail).contains("line-9999");
     }
 
     @Test
