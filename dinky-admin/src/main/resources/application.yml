@@ -165,3 +165,22 @@ knife4j:
 crypto:
   enabled: false
   encryption-password:
+
+---
+#################################################################################################################
+################################################# Spark Config ##################################################
+#################################################################################################################
+dinky:
+  spark:
+    enabled: false
+    home: /opt/spark
+    runner-jar: ${DINKY_HOME:/opt/dinky}/lib/spark/dinky-spark-runner.jar
+    master: ""
+    deploy-mode: client
+    driver-memory: 512m
+    executor-memory: 512m
+    executor-cores: 1
+    cores-max: 1
+    result-max-rows: 1000
+    submit-timeout-seconds: 600
+    conf: {}
