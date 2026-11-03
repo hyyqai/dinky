@@ -23,20 +23,22 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.regex.Pattern;
 
 public final class SparkSqlRunner {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    public static final int MAX_ROWS = 100_000;
+
+    public static final int MAX_STATEMENTS = 200;
+
+    private static final Pattern SECRET_PATTERN =
+            Pattern.compile("(?i)(password|passwd|secret|token|access[._-]?key)\\s*[=:]\\s*'?[^,'\\s)]+'?");
 
     private SparkSqlRunner() {}
 
@@ -61,19 +63,25 @@ public final class SparkSqlRunner {
         int exitCode = 0;
         SparkSession spark = null;
         try {
-            RunnerRequest request = MAPPER.readValue(requestFile.toFile(), RunnerRequest.class);
+            RunnerRequest request = RunnerFiles.readRequest(requestFile);
+            if (request.getStatements().size() > MAX_STATEMENTS) {
+                throw new IllegalArgumentException("too many statements, max " + MAX_STATEMENTS);
+            }
+            int maxRows = normalizeMaxRows(request.getMaxRows());
             spark = SparkSession.builder().appName(request.getAppName()).getOrCreate();
             response.setAppId(spark.sparkContext().applicationId());
 
+            int index = 0;
             for (String statement : request.getStatements()) {
-                System.out.println("[DINKY-SPARK] execute: " + statement);
+                index++;
+                System.out.println("[DINKY-SPARK] execute " + statementLabel(index, statement));
                 StatementResult statementResult = new StatementResult();
                 statementResult.setStatement(statement);
                 Dataset<Row> dataset = spark.sql(statement);
-                List<Row> collected = dataset.limit(request.getMaxRows() + 1).collectAsList();
-                if (collected.size() > request.getMaxRows()) {
+                List<Row> collected = dataset.limit(maxRows + 1).collectAsList();
+                if (collected.size() > maxRows) {
                     statementResult.setTruncated(true);
-                    collected = collected.subList(0, request.getMaxRows());
+                    collected = collected.subList(0, maxRows);
                 }
                 statementResult.setColumns(Arrays.asList(dataset.columns()));
                 List<List<Object>> rows = new ArrayList<>(collected.size());
@@ -86,29 +94,43 @@ public final class SparkSqlRunner {
             response.setSuccess(true);
         } catch (Throwable t) {
             response.setSuccess(false);
-            response.setError(t.getClass().getSimpleName() + ": " + t.getMessage());
+            response.setError(redact(t.getClass().getSimpleName() + ": " + t.getMessage()));
             exitCode = 1;
         } finally {
             response.setEndTime(LocalDateTime.now().toString());
-            writeResult(resultFile, response);
+            try {
+                RunnerFiles.writeResult(resultFile, response);
+            } catch (Exception e) {
+                System.err.println("[DINKY-SPARK] failed to write result file: " + e.getMessage());
+                exitCode = 1;
+            }
             if (spark != null) {
-                spark.stop();
+                try {
+                    spark.stop();
+                } catch (Exception ignored) {
+                    // Spark 停止异常不影响结果文件与退出码
+                }
             }
         }
         System.exit(exitCode);
     }
 
-    private static void writeResult(Path resultFile, RunnerResponse response) {
-        try {
-            Path tmp = Paths.get(resultFile.toString() + ".tmp");
-            MAPPER.writerWithDefaultPrettyPrinter().writeValue(tmp.toFile(), response);
-            try {
-                Files.move(tmp, resultFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            } catch (Exception e) {
-                Files.move(tmp, resultFile, StandardCopyOption.REPLACE_EXISTING);
-            }
-        } catch (Exception e) {
-            System.err.println("[DINKY-SPARK] failed to write result file: " + e.getMessage());
+    static int normalizeMaxRows(int maxRows) {
+        if (maxRows < 1) {
+            return 1;
         }
+        return Math.min(maxRows, MAX_ROWS);
+    }
+
+    static String statementLabel(int index, String statement) {
+        int length = statement == null ? 0 : statement.length();
+        return "statement #" + index + " (" + length + " chars)";
+    }
+
+    static String redact(String text) {
+        if (text == null) {
+            return null;
+        }
+        return SECRET_PATTERN.matcher(text).replaceAll("$1=***");
     }
 }

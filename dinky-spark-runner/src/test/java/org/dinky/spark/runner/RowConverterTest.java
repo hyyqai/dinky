@@ -46,6 +46,16 @@ public class RowConverterTest {
     }
 
     @Test
+    public void truncatesHugeCell() {
+        char[] chars = new char[RowConverter.MAX_CELL_CHARS + 10];
+        java.util.Arrays.fill(chars, 'a');
+        String converted = (String)
+                RowConverter.convert(RowFactory.create(new String(chars))).get(0);
+        assertThat(converted).endsWith("...(truncated)");
+        assertThat(converted.length()).isLessThanOrEqualTo(RowConverter.MAX_CELL_CHARS + 20);
+    }
+
+    @Test
     public void complexValueBecomesString() {
         Row row = RowFactory.create(new int[] {1, 2});
         assertThat(RowConverter.convert(row).get(0)).isInstanceOf(String.class);

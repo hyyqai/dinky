@@ -31,6 +31,10 @@ import java.util.List;
 
 public final class RowConverter {
 
+    public static final int MAX_CELL_CHARS = 1_000_000;
+
+    private static final String TRUNCATED = "...(truncated)";
+
     private RowConverter() {}
 
     public static List<Object> convert(Row row) {
@@ -45,8 +49,10 @@ public final class RowConverter {
         if (value == null) {
             return null;
         }
-        if (value instanceof String
-                || value instanceof Boolean
+        if (value instanceof String) {
+            return truncate((String) value);
+        }
+        if (value instanceof Boolean
                 || value instanceof Integer
                 || value instanceof Long
                 || value instanceof Short
@@ -62,8 +68,15 @@ public final class RowConverter {
             return value.toString();
         }
         if (value instanceof byte[]) {
-            return Base64.getEncoder().encodeToString((byte[]) value);
+            return truncate(Base64.getEncoder().encodeToString((byte[]) value));
         }
-        return String.valueOf(value);
+        return truncate(String.valueOf(value));
+    }
+
+    private static String truncate(String value) {
+        if (value.length() <= MAX_CELL_CHARS) {
+            return value;
+        }
+        return value.substring(0, MAX_CELL_CHARS) + TRUNCATED;
     }
 }
