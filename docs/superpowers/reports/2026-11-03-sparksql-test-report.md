@@ -143,6 +143,39 @@ Java Runtime only recognizes class file versions up to 52.0
 
 处理：使用 `-P '!jdk11,...'` 重新构建，核验 class major=52 后重新部署。
 
-## 10. 结论
+## 10. 端到端验收结果（2026-11-04，192.168.168.94）
 
-代码级测试与构建验证通过（35/35，构建成功，产物核验通过）。端到端验收待服务器部署后执行。
+部署方式：官方 `dinkydocker/dinky-standalone-server:1.2.4-flink1.20` 为基础，叠加本次发布包中的
+`dinky-admin` / `dinky-common` / runner / 前端资源，并复制 `iserv/spark:3.5.3`。
+
+| 检查 | 结果 |
+|---|---|
+| Dinky 启动 | `running/healthy`，`Version: 1.2.4`，`Java 1.8.0_504` |
+| 主查询 `COUNT/SUM` | `10 / 55 / 247390`，`status=SUCCESS`，`jobId=app-20261104084733-0001` |
+| Spark Master UI | `Dinky-spark_e2e_20261104_084729` 状态 `FINISHED` |
+| 多语句 `CREATE TEMPORARY VIEW + SELECT` | `10`，`status=SUCCESS`，app `Dinky-spark_e2e_multi_20261104_084755` `FINISHED` |
+| 失败路径（不存在的表） | `code=5`、`success=false`、`TABLE_OR_VIEW_NOT_FOUND`，错误信息末尾含 `submit.log` 路径 |
+| FlinkSql 回归（仅创建保存） | `code=0 Save Successfully` |
+| 资源处理 | 验收前 `docker compose stop spark-thrift`（worker 0/1536MB），验收后已恢复 healthy |
+
+部署过程中发现并修复的三个问题：
+
+1. **Java 版本**：本机 Maven 为 JDK 17，`jdk11` profile 自动激活，产物为 class 55，容器 Java 8 报
+   `UnsupportedClassVersionError`。改用 `-P '!jdk11,...'` 重建，核验 class major=52。
+2. **common jar 未覆盖**：`Dialect.SPARK_SQL` 在 `dinky-common`，首次只覆盖 admin 导致
+   `No enum constant org.dinky.config.Dialect.SPARK_SQL`；补充覆盖 `dinky-common-1.2.4.jar`。
+3. **tmp 权限**：Docker 为嵌套 volume 自动创建 `/opt/dinky/tmp`（root 755），Dinky 以 `flink` 运行
+   报 `Permission denied`；镜像中预创建并 `chmod 777`。
+
+部署现场说明：
+
+- 服务器镜像标签仍为 `iserv/dinky:1.2.5-flink1.20`（内容为 1.2.4 + 本次改动），旧镜像保留在
+  `iserv/dinky:1.2.5-flink1.20-backup-20261103`，可回滚。
+- 因服务器 `/iServ` 为 root 所有且 sudo 被本机策略拦截，镜像从 `admin` 家目录构建；服务器上的
+  `/iServ/app/docker/dinky/Dockerfile` 与 `.env` 尚未同步，本地 iServ 目录已更新，后续可用 sudo 落位。
+- 验收在 Dinky 项目 `test1`（id=1）下创建了 4 个测试作业（task_id 6/7/8/9），可按需删除。
+
+## 11. 结论
+
+代码级测试 35/35 通过，发布构建成功，服务器端到端验收通过：SparkSQL 作业真实提交到 Standalone
+集群并在 Master UI 可见，结果与基线一致，多语句与失败路径行为正确。
