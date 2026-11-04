@@ -52,6 +52,7 @@ import {
   PrestoIcons,
   SQLIcons,
   SqlServerIcons,
+  SparkIcons,
   StarRocksIcons
 } from '@/components/Icons/DBIcons';
 import { CodeTwoTone } from '@ant-design/icons';
@@ -208,7 +209,7 @@ export const getTabIcon = (type: string, size?: number) => {
     case DIALECT.FLINK_SQL:
       return <FlinkSQLSvg size={size} />;
     case DIALECT.SPARK_SQL:
-      return <SQLIcons size={size} />;
+      return <SparkIcons size={size} />;
     case DIALECT.FLINKSQLENV:
       return <FlinkSQLEnvSvg size={size} />;
     case DIALECT.SQL:
