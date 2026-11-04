@@ -52,7 +52,7 @@
 - `RunnerFilesTest`：符号链接拒绝、0600 权限、拒绝覆盖结果文件
 - `SparkSqlRunnerTest`：脱敏（`=`/`=>`/空格、单双引号、反引号、SQL 双写引号、JDBC userinfo）、失败摘要不含堆栈、单元格/行数上限
 
-测试日志保存在 `.superpowers/sdd/2026-11-03-sparksql-job-type/test-logs/`（本地，未入库）。
+测试日志保存在 `docs/superpowers/reports/artifacts/`。
 
 ## 4. 前端检查
 
@@ -151,7 +151,7 @@ Java Runtime only recognizes class file versions up to 52.0
 | 检查 | 结果 |
 |---|---|
 | Dinky 启动 | `running/healthy`，`Version: 1.2.4`，`Java 1.8.0_504` |
-| 主查询 `COUNT/SUM` | `10 / 55 / 247390`，`status=SUCCESS`，`jobId=app-20261104084733-0001` |
+| 主查询 `COUNT/SUM` | `10 / 55 / 247390`，`status=SUCCESS`，`jobId=app-20261104084733-0001`（原始响应见 `artifacts/dinky-e2e-submit.json`） |
 | Spark Master UI | `Dinky-spark_e2e_20261104_084729` 状态 `FINISHED` |
 | 多语句 `CREATE TEMPORARY VIEW + SELECT` | `10`，`status=SUCCESS`，app `Dinky-spark_e2e_multi_20261104_084755` `FINISHED` |
 | 失败路径（不存在的表） | `code=5`、`success=false`、`TABLE_OR_VIEW_NOT_FOUND`，错误信息末尾含 `submit.log` 路径 |
