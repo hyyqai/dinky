@@ -4,7 +4,7 @@
 - 分支：1.2.4
 - 代码基线：`139f716b2 fix: 补全脱敏规则并覆盖日志 tail`
 - 发布包：`build/dinky-release-1.20-1.2.4.tar.gz`（160 MB）
-- 发布包 SHA256：`8278f2c39c5faf278ffa6fce69731479df16bce0d1021c5ab3353cf01568897a`
+- 发布包 SHA256：`a8042677cd47569d7044532df3e3fc567a84ca161cb7304ae4820259e07522b7`
 
 ## 1. 测试范围
 
@@ -79,11 +79,15 @@
 
 ```bash
 ./mvnw clean package -Dmaven.test.skip=true \
-  -P aliyun,prod,web,flink-1.20,flink-single-version,npm-taobao \
+  -P '!jdk11,aliyun,prod,web,flink-1.20,flink-single-version,npm-taobao' \
   -Dspotless.check.skip=true
 ```
 
-结果：`BUILD SUCCESS`（约 1 分 53 秒）。
+结果：`BUILD SUCCESS`。
+
+> 注意：Maven 运行在 JDK 11+ 时，仓库的 `jdk11` profile 会自动激活并把字节码目标改为 11。
+> 发布包要跑在 Java 8 容器里，必须显式 `-P '!jdk11'`；已核验 `dinky-admin` 与
+> `dinky-spark-runner` 的 class major version 均为 52。
 
 包内容核验：
 
@@ -124,6 +128,21 @@ FROM paimon.ods.orders;
 7. 回归：FlinkSql / JDBC 作业创建与运行不受影响；
 8. 验收完成后恢复 `spark-thrift`。
 
-## 9. 结论
+## 9. 部署中发现的构建问题
+
+首次部署时 Dinky 容器循环重启，日志为：
+
+```
+java.lang.UnsupportedClassVersionError: org/dinky/Dinky has been compiled by a more
+recent version of the Java Runtime (class file version 55.0), this version of the
+Java Runtime only recognizes class file versions up to 52.0
+```
+
+原因：本机 Maven 运行在 JDK 17，仓库 `jdk11` profile（`<jdk>[11,)</jdk>`）自动激活，
+把发布包编译为 Java 11（class 55），而 Dinky 镜像运行 Java 8（class 52）。
+
+处理：使用 `-P '!jdk11,...'` 重新构建，核验 class major=52 后重新部署。
+
+## 10. 结论
 
 代码级测试与构建验证通过（35/35，构建成功，产物核验通过）。端到端验收待服务器部署后执行。
