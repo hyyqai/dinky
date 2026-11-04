@@ -4,7 +4,7 @@
 - 分支：1.2.4
 - 代码基线：`139f716b2 fix: 补全脱敏规则并覆盖日志 tail`
 - 发布包：`build/dinky-release-1.20-1.2.4.tar.gz`（160 MB）
-- 发布包 SHA256：`a8042677cd47569d7044532df3e3fc567a84ca161cb7304ae4820259e07522b7`
+- 发布包 SHA256：`9d6ee00628ee9d88c769b5116ac14f3d046ee13a7d7a48cbf836e1e9e8978db6`
 
 ## 1. 测试范围
 
@@ -166,6 +166,11 @@ Java Runtime only recognizes class file versions up to 52.0
    `No enum constant org.dinky.config.Dialect.SPARK_SQL`；补充覆盖 `dinky-common-1.2.4.jar`。
 3. **tmp 权限**：Docker 为嵌套 volume 自动创建 `/opt/dinky/tmp`（root 755），Dinky 以 `flink` 运行
    报 `Permission denied`；镜像中预创建并 `chmod 777`。
+
+后续 UI 调整（2026-11-04）：SparkSql 作业图标由通用 SQL 图标替换为 Apache Spark 官方品牌图标
+（Simple Icons `apachespark`，品牌色 `#E25A1C`）。仅前端静态资源变化，发布包 SHA256
+`9d6ee00628ee9d88c769b5116ac14f3d046ee13a7d7a48cbf836e1e9e8978db6`；线上 `umi.e795f9d1.js`
+已核验包含该图标路径与品牌色，容器 `running/healthy`。
 
 部署现场说明：
 
